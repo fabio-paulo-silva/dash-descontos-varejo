@@ -262,7 +262,7 @@ def git_push(repo, mensagem):
         return r.stdout.strip()
 
     print("\n  Publicando no GitHub Pages...")
-    run(["git", "add", "dados.json"])
+    run(["git", "add", "dados.json", "index.html"])
 
     # Verifica se há algo para commitar
     status = subprocess.run(
