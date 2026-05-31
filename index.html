@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · Auditoria de Descontos Manuais · O Boticário</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --accent: #6c1f7e;
+    --accent2: #9b2db5;
+    --green: #16a34a;
+    --red: #dc2626;
+    --yellow: #d97706;
+    --blue: #2563eb;
+    --row-alt: #f9fafb;
+    --alert-bg: #fef2f2;
+    --alert-border: #fca5a5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* HEADER */
+  header { background: var(--accent); color: #fff; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: .75; text-align: right; }
+
+  /* LAYOUT */
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 40px; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin: 28px 0 12px; }
+
+  /* FILTROS */
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .filters select, .filters input { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; background: var(--card); color: var(--text); }
+  .filters label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+  .btn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+  /* KPIS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .kpi .value { font-size: 22px; font-weight: 700; line-height: 1; }
+  .kpi .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .kpi.alert .value { color: var(--red); }
+  .kpi.ok .value { color: var(--green); }
+  .kpi.info .value { color: var(--accent); }
+  .kpi.warn .value { color: var(--yellow); }
+
+  /* PERÍODO */
+  .periodo-bar { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap; }
+  .periodo-bar strong { color: var(--text); }
+
+  /* TABELAS */
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--bg); padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:hover { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr.alerta-row { background: var(--alert-bg); }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: #fee2e2; color: var(--red); }
+  .badge-green { background: #dcfce7; color: var(--green); }
+  .badge-yellow { background: #fef3c7; color: var(--yellow); }
+  .badge-blue { background: #dbeafe; color: var(--blue); }
+  .badge-purple { background: #ede9fe; color: #7c3aed; }
+
+  /* BARRA DE PROPORÇÃO */
+  .bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; background: var(--accent2); }
+  .bar-fill.red { background: var(--red); }
+
+  /* PAGINAÇÃO */
+  .pagination { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); }
+  .pagination button { border: 1px solid var(--border); background: var(--card); border-radius: 5px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  .pagination button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pagination span { font-size: 12px; color: var(--muted); }
+
+  /* SEARCH */
+  .search-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+  .search-row input { border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; font-size: 13px; width: 260px; }
+  .search-row .count { font-size: 12px; color: var(--muted); }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
+  .tab { padding: 9px 18px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+
+  /* LOADING / ERROR */
+  .state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .state .icon { font-size: 40px; margin-bottom: 12px; }
+
+  /* RESPONSIVE */
+  @media(max-width:640px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    header h1 { font-size: 15px; }
+    table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛍️ Auditoria de Descontos Manuais · O Boticário</h1>
+  </div>
+  <div class="meta" id="meta-header">Carregando...</div>
+</header>
+
+<main>
+  <div id="app">
+    <div class="state"><div class="icon">⏳</div><div>Carregando dados...</div></div>
+  </div>
+</main>
+
+<script>
+// ─── UTILIDADES ───────────────────────────────────────────────────
+const R = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const P = v => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+const N = v => (v || 0).toLocaleString('pt-BR');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function sortTable(rows, col, asc) {
+  return [...rows].sort((a,b) => {
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') return asc ? va.localeCompare(vb,'pt-BR') : vb.localeCompare(va,'pt-BR');
+    return asc ? (va - vb) : (vb - va);
+  });
+}
+
+// ─── ESTADO GLOBAL ────────────────────────────────────────────────
+let D = null;
+let activeTab = 'campanhas';
+let sortState = {};
+const PAGE_SIZE = 50;
+let pages = { campanhas: 1, lojas: 1, itens: 1, alertas: 1 };
+let searches = { itens: '', alertas: '' };
+let filtroLoja = '';
+let filtroTag = '';
+
+// ─── RENDER PRINCIPAL ─────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+  if (!D) return;
+
+  const k = D.kpis;
+  const per = D.periodo;
+
+  app.innerHTML = `
+    <!-- PERÍODO -->
+    <div class="periodo-bar">
+      <span>📅 Período: <strong>${per.inicio || '—'}</strong> até <strong>${per.fim || '—'}</strong> (${per.dias || 0} dias)</span>
+      <span>📁 Gerado em: <strong>${D.gerado_em}</strong></span>
+      <span>⚠️ Threshold de alerta: <strong>&gt;${D.threshold_alerta}%</strong></span>
+    </div>
+
+    <!-- KPIs -->
+    <div class="section-title">Visão Geral</div>
+    <div class="kpi-grid">
+      <div class="kpi info">
+        <div class="label">Desconto Manual Total</div>
+        <div class="value">${R(k.total_desconto_manual)}</div>
+        <div class="sub">${P(k.pct_manual_sobre_bruto)} do valor bruto</div>
+      </div>
+      <div class="kpi warn">
+        <div class="label">Custo Real da Franqueada</div>
+        <div class="value">${R(k.custo_franqueada)}</div>
+        <div class="sub">Manual + Fidelidade</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Desconto Fidelidade</div>
+        <div class="value" style="color:var(--blue)">${R(k.total_desconto_fidelidade)}</div>
+        <div class="sub">custo da franqueada</div>
+      </div>
+      <div class="kpi ok">
+        <div class="label">Desconto Promocional</div>
+        <div class="value">${R(k.total_desconto_promo)}</div>
+        <div class="sub">ressarcido pela franqueadora</div>
+      </div>
+      <div class="kpi alert">
+        <div class="label">Alertas (&gt;${D.threshold_alerta}%)</div>
+        <div class="value">${N(k.alertas_count)}</div>
+        <div class="sub">itens com desconto excessivo</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Campanhas Manuais</div>
+        <div class="value" style="color:var(--accent)">${N(k.campanhas_distintas)}</div>
+        <div class="sub">tags distintas no período</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Cupons com Manual</div>
+        <div class="value">${N(k.cupons_com_manual)}</div>
+        <div class="sub">de ${N(k.total_cupons)} cupons totais</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Desconto Médio Manual</div>
+        <div class="value">${P(k.desconto_medio_pct)}</div>
+        <div class="sub">${R(k.desconto_medio_abs)} por item</div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="section-title">Análises</div>
+    <div class="tabs">
+      <div class="tab ${activeTab==='campanhas'?'active':''}" onclick="setTab('campanhas')">Por Campanha</div>
+      <div class="tab ${activeTab==='lojas'?'active':''}" onclick="setTab('lojas')">Por Loja</div>
+      <div class="tab ${activeTab==='itens'?'active':''}" onclick="setTab('itens')">Todos os Itens</div>
+      <div class="tab ${activeTab==='alertas'?'active':''}" onclick="setTab('alertas')">⚠️ Alertas (${N(k.alertas_count)})</div>
+    </div>
+
+    <div id="tab-content"></div>
+  `;
+
+  renderTab();
+}
+
+function setTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab').forEach(el => {
+    el.className = 'tab' + (el.getAttribute('onclick').includes(t) ? ' active' : '');
+  });
+  renderTab();
+}
+
+function renderTab() {
+  const el = document.getElementById('tab-content');
+  if (!el) return;
+  if (activeTab === 'campanhas') el.innerHTML = renderCampanhas();
+  else if (activeTab === 'lojas')     el.innerHTML = renderLojas();
+  else if (activeTab === 'itens')     el.innerHTML = renderItens();
+  else if (activeTab === 'alertas')   el.innerHTML = renderAlertas();
+}
+
+// ─── CAMPANHAS ────────────────────────────────────────────────────
+function renderCampanhas() {
+  const col = sortState.campanhas?.col || 'total_desconto';
+  const asc = sortState.campanhas?.asc ?? false;
+  let rows = sortTable(D.por_campanha, col, asc);
+  const maxDesc = Math.max(...rows.map(r => r.total_desconto));
+  const page = pages.campanhas;
+  const total = rows.length;
+  const paged = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const thead = thRow('campanhas', [
+    {k:'tag', l:'Tag / Campanha'}, {k:'total_desconto', l:'Total Desconto'},{k:'pct_medio', l:'% Médio'},
+    {k:'n_cupons', l:'Cupons'},{k:'n_itens', l:'Itens'},{k:'n_skus_distintos', l:'SKUs'},{k:'alertas', l:'Alertas'}
+  ], col, asc);
+
+  const tbody = paged.map(r => `<tr>
+    <td><span class="badge badge-purple">${esc(r.tag)}</span></td>
+    <td>
+      <div class="bar-wrap">
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(r.total_desconto/maxDesc*100)}%"></div></div>
+        <span style="white-space:nowrap">${R(r.total_desconto)}</span>
+      </div>
+    </td>
+    <td><span class="badge ${r.pct_medio > 40 ? 'badge-red' : r.pct_medio > 25 ? 'badge-yellow' : 'badge-green'}">${P(r.pct_medio)}</span></td>
+    <td>${N(r.n_cupons)}</td>
+    <td>${N(r.n_itens)}</td>
+    <td>${N(r.n_skus_distintos)}</td>
+    <td>${r.alertas > 0 ? `<span class="badge badge-red">⚠️ ${r.alertas}</span>` : '—'}</td>
+  </tr>`).join('');
+
+  return tableWrap(thead, tbody, total, page, 'campanhas');
+}
+
+// ─── LOJAS ────────────────────────────────────────────────────────
+function renderLojas() {
+  const col = sortState.lojas?.col || 'total_desconto_manual';
+  const asc = sortState.lojas?.asc ?? false;
+  let rows = sortTable(D.por_loja, col, asc);
+  const maxCusto = Math.max(...rows.map(r => r.custo_franqueada));
+  const page = pages.lojas;
+  const total = rows.length;
+  const paged = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const thead = thRow('lojas', [
+    {k:'loja', l:'Loja'}, {k:'total_desconto_manual', l:'Manual'},{k:'total_desconto_fidelidade', l:'Fidelidade'},
+    {k:'custo_franqueada', l:'Custo Franqueada'},{k:'pct_manual_bruto', l:'% Manual/Bruto'},
+    {k:'n_cupons', l:'Cupons'},{k:'alertas', l:'Alertas'}
+  ], col, asc);
+
+  const tbody = paged.map(r => `<tr>
+    <td><strong>${esc(r.loja)}</strong><br><span style="color:var(--muted);font-size:11px">#${r.codigo_loja}</span></td>
+    <td>${R(r.total_desconto_manual)}</td>
+    <td>${R(r.total_desconto_fidelidade)}</td>
+    <td>
+      <div class="bar-wrap">
+        <div class="bar-bg"><div class="bar-fill red" style="width:${Math.round(r.custo_franqueada/maxCusto*100)}%"></div></div>
+        <span style="white-space:nowrap">${R(r.custo_franqueada)}</span>
+      </div>
+    </td>
+    <td><span class="badge ${r.pct_manual_bruto > 15 ? 'badge-red' : r.pct_manual_bruto > 8 ? 'badge-yellow' : 'badge-green'}">${P(r.pct_manual_bruto)}</span></td>
+    <td>${N(r.n_cupons)}</td>
+    <td>${r.alertas > 0 ? `<span class="badge badge-red">⚠️ ${r.alertas}</span>` : '—'}</td>
+  </tr>`).join('');
+
+  return tableWrap(thead, tbody, total, page, 'lojas');
+}
+
+// ─── ITENS ────────────────────────────────────────────────────────
+function renderItens() {
+  const col = sortState.itens?.col || 'pct';
+  const asc = sortState.itens?.asc ?? false;
+  const q = searches.itens.toLowerCase();
+  let rows = D.itens.filter(r =>
+    !q || r.produto.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q)
+       || r.loja.toLowerCase().includes(q) || r.sku.includes(q)
+  );
+  rows = sortTable(rows, col, asc);
+  const page = pages.itens;
+  const total = rows.length;
+  const paged = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const thead = thRow('itens', [
+    {k:'data', l:'Data'},{k:'loja', l:'Loja'},{k:'sku', l:'SKU'},{k:'produto', l:'Produto'},
+    {k:'tag', l:'Tag'},{k:'bruto', l:'Bruto'},{k:'desconto', l:'Desconto'},{k:'pct', l:'%'}
+  ], col, asc);
+
+  const tbody = paged.map(r => `<tr class="${r.alerta ? 'alerta-row' : ''}">
+    <td style="white-space:nowrap">${esc(r.data)}</td>
+    <td style="white-space:nowrap">${esc(r.loja)}</td>
+    <td style="font-family:monospace;font-size:11px">${esc(r.sku)}</td>
+    <td>${esc(r.produto)}</td>
+    <td><span class="badge badge-purple" style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.tag)}</span></td>
+    <td>${R(r.bruto)}</td>
+    <td>${R(r.desconto)}</td>
+    <td><span class="badge ${r.alerta ? 'badge-red' : r.pct > 25 ? 'badge-yellow' : 'badge-green'}">${P(r.pct)}</span></td>
+  </tr>`).join('');
+
+  const searchBar = `<div class="search-row">
+    <input type="text" placeholder="Buscar produto, tag, loja, SKU..." value="${esc(searches.itens)}" oninput="searches.itens=this.value;pages.itens=1;renderTab()">
+    <span class="count">${N(total)} itens${q ? ' encontrados' : ''}</span>
+  </div>`;
+
+  return searchBar + tableWrap(thead, tbody, total, page, 'itens');
+}
+
+// ─── ALERTAS ──────────────────────────────────────────────────────
+function renderAlertas() {
+  const col = sortState.alertas?.col || 'pct';
+  const asc = sortState.alertas?.asc ?? false;
+  const q = searches.alertas.toLowerCase();
+  let rows = D.alertas.filter(r =>
+    !q || r.produto.toLowerCase().includes(q) || r.tag.toLowerCase().includes(q)
+       || r.loja.toLowerCase().includes(q) || r.sku.includes(q)
+  );
+  rows = sortTable(rows, col, asc);
+  const page = pages.alertas;
+  const total = rows.length;
+  const paged = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const thead = thRow('alertas', [
+    {k:'chave_cupom', l:'Chave Cupom'},{k:'data', l:'Data'},{k:'loja', l:'Loja'},
+    {k:'sku', l:'SKU'},{k:'produto', l:'Produto'},{k:'tag', l:'Tag'},
+    {k:'bruto', l:'Bruto'},{k:'desconto', l:'Desconto'},{k:'pct', l:'%'}
+  ], col, asc);
+
+  const tbody = total === 0
+    ? `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">✅ Nenhum alerta encontrado</td></tr>`
+    : paged.map(r => `<tr class="alerta-row">
+        <td style="font-family:monospace;font-size:11px">${esc(r.chave_cupom)}</td>
+        <td style="white-space:nowrap">${esc(r.data)}</td>
+        <td>${esc(r.loja)}</td>
+        <td style="font-family:monospace;font-size:11px">${esc(r.sku)}</td>
+        <td>${esc(r.produto)}</td>
+        <td><span class="badge badge-purple" style="font-size:10px">${esc(r.tag)}</span></td>
+        <td>${R(r.bruto)}</td>
+        <td>${R(r.desconto)}</td>
+        <td><span class="badge badge-red">${P(r.pct)}</span></td>
+      </tr>`).join('');
+
+  const searchBar = `<div class="search-row">
+    <input type="text" placeholder="Buscar produto, tag, loja, SKU..." value="${esc(searches.alertas)}" oninput="searches.alertas=this.value;pages.alertas=1;renderTab()">
+    <span class="count">${N(total)} alerta(s)</span>
+  </div>`;
+
+  return searchBar + tableWrap(thead, tbody, total, page, 'alertas');
+}
+
+// ─── HELPERS DE TABELA ────────────────────────────────────────────
+function thRow(tab, cols, activeCol, activeAsc) {
+  return '<tr>' + cols.map(c => {
+    const active = c.k === activeCol;
+    const arrow = active ? (activeAsc ? ' ▲' : ' ▼') : '';
+    return `<th onclick="doSort('${tab}','${c.k}')">${c.l}${arrow}</th>`;
+  }).join('') + '</tr>';
+}
+
+function tableWrap(thead, tbody, total, page, tab) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  let pag = '';
+  if (totalPages > 1) {
+    const prev = page > 1 ? `<button onclick="setPage('${tab}',${page-1})">‹</button>` : '';
+    const next = page < totalPages ? `<button onclick="setPage('${tab}',${page+1})">›</button>` : '';
+    const nums = [...Array(Math.min(totalPages,7)).keys()].map(i => {
+      const p = i+1;
+      return `<button class="${p===page?'active':''}" onclick="setPage('${tab}',${p})">${p}</button>`;
+    }).join('');
+    pag = `<div class="pagination">${prev}${nums}${next}<span>${N((page-1)*PAGE_SIZE+1)}–${N(Math.min(page*PAGE_SIZE,total))} de ${N(total)}</span></div>`;
+  }
+  return `<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table>${pag}</div>`;
+}
+
+function doSort(tab, col) {
+  const cur = sortState[tab];
+  sortState[tab] = { col, asc: cur?.col === col ? !cur.asc : false };
+  pages[tab] = 1;
+  renderTab();
+}
+
+function setPage(tab, p) {
+  pages[tab] = p;
+  renderTab();
+}
+
+// ─── LOAD ─────────────────────────────────────────────────────────
+fetch('dados.json?v=' + Date.now())
+  .then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(data => {
+    D = data;
+    const k = D.kpis;
+    document.getElementById('meta-header').innerHTML =
+      `Período: ${D.periodo.inicio} → ${D.periodo.fim}<br>Gerado em: ${D.gerado_em}`;
+    render();
+  })
+  .catch(err => {
+    document.getElementById('app').innerHTML = `
+      <div class="state">
+        <div class="icon">❌</div>
+        <div><strong>Não foi possível carregar dados.json</strong></div>
+        <div style="margin-top:8px;font-size:12px">
+          ${err.message}<br><br>
+          Se estiver abrindo o arquivo local diretamente (file://), use um servidor HTTP.<br>
+          No GitHub Pages funcionará normalmente.
+        </div>
+      </div>`;
+  });
+</script>
+</body>
+</html>
