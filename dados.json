@@ -1,0 +1,24 @@
+{
+  "gerado_em": "31/05/2026 10:00",
+  "threshold_alerta": 40,
+  "periodo": {},
+  "kpis": {
+    "total_linhas_brutas": 0,
+    "total_cupons": 0,
+    "cupons_com_manual": 0,
+    "itens_manuais": 0,
+    "campanhas_distintas": 0,
+    "alertas_count": 0,
+    "total_desconto_manual": 0,
+    "total_desconto_fidelidade": 0,
+    "total_desconto_promo": 0,
+    "custo_franqueada": 0,
+    "pct_manual_sobre_bruto": 0,
+    "desconto_medio_abs": 0,
+    "desconto_medio_pct": 0
+  },
+  "por_campanha": [],
+  "por_loja": [],
+  "itens": [],
+  "alertas": []
+}
