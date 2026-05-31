@@ -23,7 +23,7 @@ from datetime import datetime
 # CONFIGURAÇÕES — edite aqui uma única vez
 # ─────────────────────────────────────────────
 
-PASTA_PADRAO = r"C:/Users/fabio.silva/OneDrive - Gentil Negócios/Documentos/Claude/Projects/Analista Auditor de Descontos/Dados Dashboard descontos varejo/Descontos RGB"
+PASTA_PADRAO = r"C:/Users/fabio.silva/Gentil Negócios/File server-GN - 03. Time da CIP/Dados Dashboard descontos varejo/Descontos RGB"
 REPO_PADRAO      = os.path.dirname(__file__)   # pasta onde está o merge.py = raiz do repo
 SAIDA_PADRAO     = os.path.join(REPO_PADRAO, "dados.json")
 THRESHOLD_ALERTA = 40   # % de desconto Manual que dispara alerta
@@ -73,7 +73,16 @@ def extrair_tag_manual(motivo):
 def ler_csv(caminho):
     linhas = []
     try:
-        with open(caminho, encoding="utf-8-sig") as f:
+        for enc in ("utf-8-sig", "latin-1", "cp1252", "utf-8"):
+            try:
+                open(caminho, encoding=enc).read(512)
+                encoding_ok = enc
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            encoding_ok = "latin-1"
+        with open(caminho, encoding=encoding_ok) as f:
             for row in csv.DictReader(f, delimiter=";"):
                 row = {k.strip(): v.strip() for k, v in row.items()}
                 boleto = row.get("N. Boleto", "").strip()
@@ -214,7 +223,8 @@ def construir_dados(linhas, threshold):
 
     # Itens para tabela
     itens = [
-        {"chave_cupom": m["chave_cupom"], "boleto": m["boleto"], "loja": m["loja"],
+        {"chave_cupom": m["chave_cupom"], "boleto": m["boleto"],
+         "loja": m["loja"], "codigo_loja": m["codigo_loja"],
          "data": m["data"], "sku": m["sku"], "produto": m["produto"],
          "linha": m["linha_produto"], "tag": m["tag"], "qtd": m["qtd"],
          "bruto": round(m["bruto"],2), "desconto": round(m["desconto"],2),
@@ -262,7 +272,7 @@ def git_push(repo, mensagem):
         return r.stdout.strip()
 
     print("\n  Publicando no GitHub Pages...")
-    run(["git", "add", "dados.json", "index.html"])
+    run(["git", "add", "dados.json"])
 
     # Verifica se há algo para commitar
     status = subprocess.run(
