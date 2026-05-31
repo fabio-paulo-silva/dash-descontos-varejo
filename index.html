@@ -7,40 +7,43 @@
 <style>
 :root {
   /* ── Gentil Negócios Brand ─────────────────── */
-  --bg:           #F5F2EE;
+  --bg:           #F2F5F8;
   --card:         #FFFFFF;
-  --border:       #DDD5CC;
-  --text:         #1C1714;
-  --muted:        #7A706A;
-  /* Wine / burgundy – primary */
-  --accent:       #8C1C3C;
-  --accent2:      #B02250;
-  --accent-light: #FBF0F4;
-  /* Gold – secondary */
-  --gold:         #A87820;
-  --gold-bg:      #FBF3E2;
+  --border:       #D4DCE6;
+  --text:         #111827;
+  --muted:        #64748B;
+  /* Marinho – primary brand dark */
+  --accent:       #162032;
+  --accent2:      #28C76F;
+  --accent-light: #E6F7EF;
+  /* Verde marca – brand green */
+  --brand-green:  #28C76F;
+  --brand-green-bg:#E6F7EF;
+  /* Gold → ciano (paleta secundária) */
+  --gold:         #0EA5E9;
+  --gold-bg:      #E0F4FF;
   /* Status */
-  --green:        #15602E;  --green-bg:  #D4F5DF;
-  --red:          #B91C1C;  --red-bg:    #FEE2E2;
-  --yellow:       #854D0E;  --yellow-bg: #FEF3C7;
-  --blue:         #1B40B0;  --blue-bg:   #DBEAFE;
-  --teal:         #0D7A6F;  --teal-bg:   #CCFBF1;
-  --orange:       #B83C0C;  --orange-bg: #FFEDD5;
+  --green:        #16A34A;  --green-bg:  #DCFCE7;
+  --red:          #DC2626;  --red-bg:    #FEE2E2;
+  --yellow:       #D97706;  --yellow-bg: #FEF3C7;
+  --blue:         #2563EB;  --blue-bg:   #DBEAFE;
+  --teal:         #0D9488;  --teal-bg:   #CCFBF1;
+  --orange:       #EA580C;  --orange-bg: #FFEDD5;
   /* Tipo desconto */
-  --promo:        #1B4ED8;  --promo-bg:  #EEF2FF;
-  --fid:          #6D28D9;  --fid-bg:    #F5F3FF;
+  --promo:        #2563EB;  --promo-bg:  #EEF2FF;
+  --fid:          #7C3AED;  --fid-bg:    #F5F3FF;
   /* Grupos de tag */
-  --g-venc:       #0D7A6F;  --g-venc-bg: #CCFBF1;
-  --g-vic:        #A87820;  --g-vic-bg:  #FBF3E2;
-  --g-imp:        #1B4ED8;  --g-imp-bg:  #EEF2FF;
-  --g-colab:      #B83C0C;  --g-colab-bg:#FFEDD5;
-  --g-outros:     #7A706A;  --g-outros-bg:#F0EDEA;
+  --g-venc:       #0D9488;  --g-venc-bg: #CCFBF1;
+  --g-vic:        #D97706;  --g-vic-bg:  #FEF3C7;
+  --g-imp:        #2563EB;  --g-imp-bg:  #DBEAFE;
+  --g-colab:      #EA580C;  --g-colab-bg:#FFEDD5;
+  --g-outros:     #64748B;  --g-outros-bg:#F1F5F9;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
 
 /* ── Header ───────────────────────────────── */
-header{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 60%,#C4395A 100%);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(140,28,60,.35)}
+header{background:linear-gradient(135deg,#162032 0%,#1E3547 100%);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 10px rgba(22,32,50,.4);border-bottom:3px solid var(--brand-green)}
 header h1{font-size:17px;font-weight:700;letter-spacing:.01em}
 header h1 span{opacity:.75;font-weight:400;font-size:13px;margin-left:8px}
 #meta-header{font-size:11px;opacity:.8;text-align:right;white-space:nowrap;line-height:1.6}
@@ -83,6 +86,7 @@ main{max-width:1440px;margin:0 auto;padding:16px 14px 56px}
 
 /* ── Section titles ───────────────────────── */
 .section-title{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';width:3px;height:14px;background:var(--brand-green);border-radius:2px;flex-shrink:0}
 .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* ── KPI cards ───────────────────────────── */
@@ -92,7 +96,7 @@ main{max-width:1440px;margin:0 auto;padding:16px 14px 56px}
 .kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .kpi .value{font-size:21px;font-weight:700;line-height:1.1;color:var(--kpi-color,var(--text))}
 .kpi .sub{font-size:11px;color:var(--muted);margin-top:4px}
-.kpi.c-wine{--kpi-color:var(--accent)}
+.kpi.c-navy{--kpi-color:var(--accent)}.kpi.c-wine{--kpi-color:var(--accent)}.kpi.c-brand{--kpi-color:var(--brand-green)}
 .kpi.c-red{--kpi-color:var(--red)}
 .kpi.c-green{--kpi-color:var(--green)}
 .kpi.c-blue{--kpi-color:var(--blue)}
@@ -144,7 +148,7 @@ main{max-width:1440px;margin:0 auto;padding:16px 14px 56px}
 /* ── Tabs ─────────────────────────────────── */
 .tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
 .tab{padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
-.tab.active{color:var(--accent);border-color:var(--accent)}
+.tab.active{color:var(--accent);border-color:var(--brand-green)}
 .tab:hover:not(.active){color:var(--text)}
 
 /* ── Tables ───────────────────────────────── */
@@ -187,7 +191,7 @@ tbody td{padding:8px 12px;vertical-align:middle}
 /* ── Bar ──────────────────────────────────── */
 .bar-wrap{display:flex;align-items:center;gap:8px}
 .bar-bg{flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden;min-width:50px}
-.bar-fill{height:100%;border-radius:99px;background:var(--accent2)}
+.bar-fill{height:100%;border-radius:99px;background:var(--brand-green)}
 .bar-fill.green{background:var(--green)}
 .bar-fill.red{background:var(--red)}
 .bar-fill.teal{background:var(--teal)}
@@ -442,14 +446,13 @@ function renderDataSection(){
   '<div class="section-title">Visão Geral — Descontos Manuais</div>'+
   '<div class="kpi-grid">'+
     buildSavingHeroKpi(sv)+
-    kpiCard('c-wine','Desconto Manual Total',R(k.total_manual),P(k.pct_manual_bruto)+' do valor bruto')+
-    kpiCard('c-orange','Custo Real Franqueada',R(k.custo_franqueada),'Manual + Fidelidade (sem ressarcimento)')+
-    kpiCard('c-blue','Receita Gerada (Líquido)',R(k.total_liquido),'valor líquido com desconto manual')+
+    kpiCard('c-navy','Desconto Manual Total',R(k.total_manual),P(k.pct_manual_bruto)+' do valor bruto')+
+    kpiCard('c-brand','Receita Gerada (Líquido)',R(k.total_liquido),'valor líquido com desconto manual')+
     kpiCard('c-green','Qtd. Itens Vendidos',N(k.total_qtd),N(k.itens_manuais)+' linhas · '+N(k.total_cupons)+' cupons')+
     kpiCard('c-promo','Promocional (a Ressarcir)',R(kp.a_ressarcir),'pago pela franqueadora via BSO')+
     kpiCard('c-fid','Fidelidade',R(kf.total),'custo da franqueada · '+N(kf.n_cupons)+' cupons')+
     kpiCard('c-red','Alertas',N(k.total_alertas),(k.alertas_criticos>0?'⚠ '+N(k.alertas_criticos)+' críticos · ':'')+N(k.promo_sem_id)+' promo sem ID')+
-    kpiCard('c-wine','Tags / Ações Distintas',N(k.campanhas_distintas),'campanhas manuais ativas no período')+
+    kpiCard('c-navy','Tags / Ações Distintas',N(k.campanhas_distintas),'campanhas manuais ativas no período')+
   '</div>'+
 
   '<div class="section-title">Saving de Vencimento</div>'+
