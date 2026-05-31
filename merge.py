@@ -1,5 +1,5 @@
 """
-merge.py — Auditoria de Descontos Manuais · O Boticário
+merge.py — Auditoria de Descontos Manuais - O Boticário
 ========================================================
 Lê todos os CSVs de descontos de uma pasta (OneDrive),
 aplica deduplicação e regras de negócio, gera dados.json
@@ -221,7 +221,7 @@ def construir_dados(linhas, threshold):
         for n, lj in sorted(pl.items(), key=lambda x: -x[1]["total_manual"])
     ]
 
-    # Itens para tabela
+    # Itens Manuais para tabela
     itens = [
         {"chave_cupom": m["chave_cupom"], "boleto": m["boleto"],
          "loja": m["loja"], "codigo_loja": m["codigo_loja"],
@@ -232,6 +232,111 @@ def construir_dados(linhas, threshold):
          "alerta": m["alerta"], "arquivo": m["arquivo"]}
         for m in sorted(manuais, key=lambda x: -x["pct"])
     ]
+
+    # ── Agregação Promocional ──────────────────────────────────────
+    promos = [l for l in linhas if l["origem"] == "PROMOCIONAL"]
+    for p in promos:
+        p["pct"]    = round(p["desconto"] / p["bruto"] * 100, 2) if p["bruto"] > 0 else 0.0
+        p["sem_id"] = not bool(p["id_campanha"])
+
+    pc_promo = defaultdict(lambda: {"desc":"","total":0,"bruto":0,"cupons":set(),"skus":set(),"n_itens":0,"sem_id":False})
+    for p in promos:
+        key = p["id_campanha"] or ("SEM:" + p["desc_campanha"])
+        c = pc_promo[key]
+        c["desc"]    = p["desc_campanha"]
+        c["sem_id"]  = p["sem_id"]
+        c["total"]  += p["desconto"]
+        c["bruto"]  += p["bruto"]
+        c["cupons"].add(p["chave_cupom"])
+        c["skus"].add(p["sku"])
+        c["n_itens"] += 1
+    por_campanha_promo = [
+        {"id": k if not v["sem_id"] else "", "desc": v["desc"], "sem_id": v["sem_id"],
+         "total_desconto": round(v["total"],2), "total_bruto": round(v["bruto"],2),
+         "pct_medio": round(v["total"]/v["bruto"]*100,2) if v["bruto"] else 0,
+         "n_cupons": len(v["cupons"]), "n_skus": len(v["skus"]), "n_itens": v["n_itens"]}
+        for k, v in sorted(pc_promo.items(), key=lambda x: -x[1]["total"])
+    ]
+
+    pl_promo = defaultdict(lambda: {"total":0,"bruto":0,"cupons":set(),"n_itens":0,"codigo_loja":""})
+    for p in promos:
+        lj = pl_promo[p["loja"]]
+        lj["codigo_loja"] = p["codigo_loja"]
+        lj["total"]  += p["desconto"]
+        lj["bruto"]  += p["bruto"]
+        lj["cupons"].add(p["chave_cupom"])
+        lj["n_itens"] += 1
+    por_loja_promo = [
+        {"loja": n, "codigo_loja": lj["codigo_loja"],
+         "total_desconto": round(lj["total"],2), "total_bruto": round(lj["bruto"],2),
+         "pct": round(lj["total"]/lj["bruto"]*100,2) if lj["bruto"] else 0,
+         "n_cupons": len(lj["cupons"]), "n_itens": lj["n_itens"]}
+        for n, lj in sorted(pl_promo.items(), key=lambda x: -x[1]["total"])
+    ]
+
+    mes_promo = defaultdict(lambda: {"total":0,"bruto":0,"cupons":set()})
+    for p in promos:
+        mk = p["data"][6:10] + "-" + p["data"][3:5]
+        mes_promo[mk]["total"]  += p["desconto"]
+        mes_promo[mk]["bruto"]  += p["bruto"]
+        mes_promo[mk]["cupons"].add(p["chave_cupom"])
+    evolucao_promo = [
+        {"mes": k, "total_desconto": round(v["total"],2), "total_bruto": round(v["bruto"],2),
+         "pct": round(v["total"]/v["bruto"]*100,2) if v["bruto"] else 0,
+         "n_cupons": len(v["cupons"])}
+        for k, v in sorted(mes_promo.items())
+    ]
+
+    # Alertas promo sem ID — apenas campos essenciais, limitado a 500
+    alertas_promo_sem_id = [
+        {"chave_cupom": p["chave_cupom"], "loja": p["loja"], "data": p["data"],
+         "sku": p["sku"], "produto": p["produto"], "desc_campanha": p["desc_campanha"],
+         "desconto": round(p["desconto"],2), "bruto": round(p["bruto"],2), "pct": p["pct"]}
+        for p in promos if p["sem_id"]
+    ][:500]
+
+    promo_sem_id_count   = sum(1 for p in promos if p["sem_id"])
+    promo_a_ressarcir    = sum(p["desconto"] for p in promos if not p["sem_id"])
+    promo_sem_id_val     = sum(p["desconto"] for p in promos if p["sem_id"])
+    promo_n_campanhas    = len(set(p["id_campanha"] for p in promos if p["id_campanha"]))
+    promo_n_cupons       = len(set(p["chave_cupom"] for p in promos))
+
+    # ── Agregação Fidelidade ───────────────────────────────────────
+    fids = [l for l in linhas if l["origem"] == "FIDELIDADE"]
+    total_bruto_fid = sum(f["bruto"] for f in fids)
+
+    pl_fid = defaultdict(lambda: {"total":0,"bruto":0,"cupons":set(),"n_itens":0,"codigo_loja":""})
+    for f in fids:
+        lj = pl_fid[f["loja"]]
+        lj["codigo_loja"] = f["codigo_loja"]
+        lj["total"]  += f["desconto"]
+        lj["bruto"]  += f["bruto"]
+        lj["cupons"].add(f["chave_cupom"])
+        lj["n_itens"] += 1
+    por_loja_fid = [
+        {"loja": n, "codigo_loja": lj["codigo_loja"],
+         "total_desconto": round(lj["total"],2), "total_bruto": round(lj["bruto"],2),
+         "pct_bruto": round(lj["total"]/lj["bruto"]*100,2) if lj["bruto"] else 0,
+         "n_cupons": len(lj["cupons"]), "n_itens": lj["n_itens"]}
+        for n, lj in sorted(pl_fid.items(), key=lambda x: -x[1]["total"])
+    ]
+
+    mes_fid = defaultdict(lambda: {"total":0,"bruto":0,"cupons":set()})
+    for f in fids:
+        mk = f["data"][6:10] + "-" + f["data"][3:5]
+        mes_fid[mk]["total"]  += f["desconto"]
+        mes_fid[mk]["bruto"]  += f["bruto"]
+        mes_fid[mk]["cupons"].add(f["chave_cupom"])
+    evolucao_fid = [
+        {"mes": k, "total_desconto": round(v["total"],2), "total_bruto": round(v["bruto"],2),
+         "pct": round(v["total"]/v["bruto"]*100,2) if v["bruto"] else 0,
+         "n_cupons": len(v["cupons"])}
+        for k, v in sorted(mes_fid.items())
+    ]
+
+    fid_n_cupons = len(set(f["chave_cupom"] for f in fids))
+    fid_ticket   = round(total_fidelidade / fid_n_cupons, 2) if fid_n_cupons else 0
+    fid_pct_bruto = round(total_fidelidade / total_bruto_fid * 100, 2) if total_bruto_fid else 0
 
     return {
         "gerado_em":        datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -251,11 +356,26 @@ def construir_dados(linhas, threshold):
             "pct_manual_sobre_bruto":    pct_manual_bruto,
             "desconto_medio_abs":        medio_abs,
             "desconto_medio_pct":        medio_pct,
+                "promo_sem_id":              promo_sem_id_count,
+            "promo_a_ressarcir":         round(promo_a_ressarcir,2),
+            "promo_sem_id_val":          round(promo_sem_id_val,2),
+            "promo_n_campanhas":         promo_n_campanhas,
+            "promo_n_cupons":            promo_n_cupons,
+            "fid_n_cupons":              fid_n_cupons,
+            "fid_n_itens":               len(fids),
+            "fid_pct_bruto":             fid_pct_bruto,
+            "fid_ticket":                fid_ticket,
         },
-        "por_campanha": por_campanha,
-        "por_loja":     por_loja,
-        "itens":        itens,
-        "alertas":      [i for i in itens if i["alerta"]],
+        "por_campanha":          por_campanha,
+        "por_loja":              por_loja,
+        "itens":                 itens,
+        "alertas":               [i for i in itens if i["alerta"]],
+        "por_campanha_promo":    por_campanha_promo,
+        "por_loja_promo":        por_loja_promo,
+        "evolucao_promo":        evolucao_promo,
+        "alertas_promo_sem_id":  alertas_promo_sem_id,
+        "por_loja_fid":          por_loja_fid,
+        "evolucao_fid":          evolucao_fid,
     }
 
 
@@ -272,7 +392,7 @@ def git_push(repo, mensagem):
         return r.stdout.strip()
 
     print("\n  Publicando no GitHub Pages...")
-    run(["git", "add", "dados.json"])
+    run(["git", "add", "dados.json", "index.html"])
 
     # Verifica se há algo para commitar
     status = subprocess.run(
@@ -285,7 +405,7 @@ def git_push(repo, mensagem):
 
     run(["git", "commit", "-m", mensagem])
     run(["git", "push"])
-    print("  ✓ Deploy concluído — dashboard atualizado em instantes.")
+    print("  OK Deploy concluído — dashboard atualizado em instantes.")
 
 
 # ─────────────────────────────────────────────
@@ -297,7 +417,7 @@ def main():
     SEP  = "=" * 55
 
     print(SEP)
-    print("  Auditoria de Descontos Manuais · O Boticário")
+    print("  Auditoria de Descontos Manuais - O Boticário")
     print(SEP)
     print(f"  Pasta CSVs  : {args.pasta}")
     print(f"  Saída JSON  : {args.saida}")
@@ -314,14 +434,14 @@ def main():
 
     print(f"  {len(arquivos)} arquivo(s) encontrado(s):")
     for a in arquivos:
-        print(f"    · {os.path.basename(a)}")
+        print(f"    - {os.path.basename(a)}")
     print()
 
     # 2. Lê e combina
     linhas = []
     for arq in arquivos:
         lidas = ler_csv(arq)
-        print(f"  [{os.path.basename(arq)}] → {len(lidas)} linhas")
+        print(f"  [{os.path.basename(arq)}] -> {len(lidas)} linhas")
         linhas.extend(lidas)
 
     # 3. Deduplica
@@ -333,7 +453,7 @@ def main():
     if inc:
         print(f"  [AVISO] {len(inc)} linha(s) com inconsistência Bruto−Desconto≠Líquido")
         for i in inc[:3]:
-            print(f"    · {i['chave_cupom']} SKU {i['sku']}: informado={i['liquido_informado']} calculado={i['liquido_calculado']}")
+            print(f"    - {i['chave_cupom']} SKU {i['sku']}: informado={i['liquido_informado']} calculado={i['liquido_calculado']}")
     else:
         print("  Validação: OK")
 
@@ -347,8 +467,8 @@ def main():
 
     k = dados["kpis"]
     per = dados["periodo"]
-    print(f"\n  ✓ dados.json salvo")
-    print(f"\n  Período: {per.get('inicio','')} → {per.get('fim','')} ({per.get('dias',0)} dia(s))")
+    print(f"\n  OK dados.json salvo")
+    print(f"\n  Período: {per.get('inicio','')} -> {per.get('fim','')} ({per.get('dias',0)} dia(s))")
     print(f"  Cupons totais          : {k['total_cupons']}")
     print(f"  Cupons com Manual      : {k['cupons_com_manual']}")
     print(f"  Total desconto Manual  : R$ {k['total_desconto_manual']:>10,.2f}".replace(",","X").replace(".",",").replace("X","."))
@@ -358,7 +478,7 @@ def main():
     # 7. Deploy
     if not args.sem_deploy:
         try:
-            msg = f"dados: {per.get('inicio','')} → {per.get('fim','')} | {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+            msg = f"dados: {per.get('inicio','')} -> {per.get('fim','')} | {datetime.now().strftime('%d/%m/%Y %H:%M')}"
             git_push(args.repo, msg)
         except RuntimeError as e:
             print(f"\n  [ERRO no deploy] {e}")
