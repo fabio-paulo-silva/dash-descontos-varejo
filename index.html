@@ -366,8 +366,6 @@ function calcular(itens){
 
   const plMap={};
   itens.forEach(i=>{ const l=i.loja; if(!plMap[l])plMap[l]={loja:l,codigo_loja:i.codigo_loja,manual:0,bruto:0,liquido:0,qtd:0,cupons:new Set(),alertas:0,venc_bruto:0,venc_liquido:0,fidelidade:0,promo:0}; const lj=plMap[l]; lj.manual+=+i.desconto; lj.bruto+=+i.bruto; lj.liquido+=+i.liquido; lj.qtd+=+i.qtd; lj.cupons.add(i.chave_cupom); if(i.alerta)lj.alertas++; if(isVenc(i.tag||'')){lj.venc_bruto+=+i.bruto;lj.venc_liquido+=+i.liquido;} });
-  fids.forEach(i=>{ if(plMap[i.loja]) plMap[i.loja].fidelidade+=+i.desconto; });
-  promos.forEach(i=>{ if(plMap[i.loja]) plMap[i.loja].promo+=+i.desconto; });
   const por_loja=Object.values(plMap).map(l=>({...l,n_cupons:l.cupons.size,custo:l.manual+l.fidelidade,pct_manual:l.bruto>0?l.manual/l.bruto*100:0})).sort((a,b)=>b.manual-a.manual);
 
   const mesMap={}; vencItems.forEach(i=>{const mk=monthKey(i.data);if(!mesMap[mk])mesMap[mk]={mes:mk,bruto:0,liquido:0,desconto:0,qtd:0,skus:new Set()};mesMap[mk].bruto+=+i.bruto;mesMap[mk].liquido+=+i.liquido;mesMap[mk].desconto+=+i.desconto;mesMap[mk].qtd+=+i.qtd;mesMap[mk].skus.add(i.sku);});
