@@ -259,6 +259,7 @@ tbody td{padding:8px 12px;vertical-align:middle}
 .vazao-bar{flex:1;height:8px;background:var(--border);border-radius:99px;overflow:hidden;min-width:60px}
 .vazao-fill{height:100%;border-radius:99px;transition:width .3s}
 .transgression-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.giro-toggle-row{cursor:pointer;user-select:none}.giro-toggle-row:hover td{background:rgba(40,199,111,.06)}
 .tb-nao-listado{background:#FEE2E2;color:#B91C1C}
 .tb-excesso{background:#FEF3C7;color:#D97706}
 .tb-ok{background:#DCFCE7;color:#16A34A}
@@ -343,6 +344,11 @@ let RAW=null, D=null, activeTab='campanhas', sortState={};
 const PAGE_SIZE=50;
 let pages={campanhas:1,lojas:1,itens:1,alertas:1,vencimento:1,promo:1,fidelidade:1};
 let searches={itens:'',alertas:'',vencimento:'',promo:'',fidelidade:'',auditoria_t:'',auditoria_v:''};
+let FA={dataIni:'',dataFim:'',loja:''};  // filtros da auditoria
+function toggleGiroDetail(id){
+  document.querySelectorAll('.gd-'+id).forEach(r=>{r.style.display=r.style.display==='none'?'':'none';});
+  const ic=document.getElementById('gi-'+id); if(ic) ic.textContent=ic.textContent==='▶'?'▼':'▶';
+}
 let F={mes:'',dataIni:'',dataFim:'',tags:[],grupo:''};
 let msOpen=false, msSearch='';
 
@@ -609,78 +615,78 @@ function buildSavingHeroKpi(sv){
     +'</div></div>';
 }
 
-// ── Giro por loja ─────────────────────────────────────────────────
-function renderGiro(){
-  const g = D.giro;
-  if(!g || !g.lojas.length){
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;color:var(--muted);font-size:13px">Lista de vencimento próximo não carregada. Execute o merge.py para habilitar o giro.</div>';
-  }
-  const gt = g.total;
-  // KPIs de giro
+// ── Giro por loja (recebe dados já computados) ────────────────────
+function renderGiro(giroLojas, giroTotal){
+  if(!giroLojas || !giroLojas.length)
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;color:var(--muted);font-size:13px">Nenhum dado de giro encontrado para os filtros selecionados.</div>';
+
+  const gt = giroTotal;
   let html = '<div class="kpi-grid" style="margin-bottom:14px">'
-    + kpiCard('c-brand','Vazão Geral',P(gt.vazao), N(gt.qtd_vendida)+' vendidos de '+N(gt.qtd_lista)+' listados')
-    + kpiCard('c-green','SKUs Girados',N(gt.skus_girados)+' / '+N(gt.skus),'SKUs com ao menos 1 venda com tag vencimento')
-    + kpiCard('c-red','Transgressões',N(g.lojas.reduce((s,l)=>s+l.transgressoes.length,0)),'vendas com tag venc em SKU não autorizado')
-    + kpiCard('c-yellow','SKUs Parados',N(gt.skus - gt.skus_girados),'na lista mas sem venda registrada')
+    + auditKpi('c-brand','Vazão Geral',P(gt.vazao), N(gt.qtd_vendida)+' vendidos de '+N(gt.qtd_lista)+' listados')
+    + auditKpi('c-green','SKUs Girados',N(gt.skus_girados)+' / '+N(gt.skus),'ao menos 1 venda com tag vencimento')
+    + auditKpi('c-red','Transgressões',N(giroLojas.reduce((s,l)=>s+l.transgressoes.length,0)),'vendas com tag venc em SKU não autorizado')
+    + auditKpi('c-yellow','SKUs Parados',N(gt.skus - gt.skus_girados),'na lista mas sem venda registrada')
+    + auditKpi('c-navy','% Desconto s/ Bruto',P(gt.bruto>0?gt.desconto/gt.bruto*100:0),'desconto médio aplicado nas vendas de vencimento')
     + '</div>';
 
-  // Tabela por loja — expansível
   html += '<div class="table-wrap"><table><thead><tr>'
-    + '<th>Loja</th><th>Qtd Lista</th><th>Qtd Vendida</th><th>Vazão</th>'
-    + '<th>SKUs Girados</th><th>Transgressões</th><th>Situação</th>'
+    + '<th style="width:28px"></th><th>Loja</th><th>Qtd Lista</th><th>Qtd Vendida</th>'
+    + '<th>Vazão</th><th>% Desconto</th><th>Desconto Total</th><th>SKUs Girados</th><th>Situação</th>'
     + '</tr></thead><tbody>';
 
-  g.lojas.forEach(l => {
+  giroLojas.forEach(l => {
+    const sid       = (''+l.bcps).replace(/\W/g,'_');
     const temTransg = l.transgressoes.length > 0;
     const semVenda  = l.qtd_lista > 0 && l.qtd_vendida === 0;
     const excesso   = l.qtd_vendida > l.qtd_lista && l.qtd_lista > 0;
+    const temDetalhe= temTransg || excesso;
     const rowClass  = temTransg ? 'alerta-crit-row' : excesso ? 'alerta-row' : semVenda ? '' : 'venc-row';
     const barColor  = temTransg||excesso ? 'var(--red)' : l.vazao>=80 ? 'var(--green)' : l.vazao>0 ? 'var(--brand-green)' : 'var(--muted)';
     const barW      = Math.min(l.vazao||0, 100);
+    const pctDesc   = l.bruto > 0 ? l.desconto/l.bruto*100 : 0;
 
-    // Situação descritiva
     let situacao = '';
-    if(temTransg)  situacao += '<span class="transgression-badge tb-nao-listado" style="margin:1px">⚠ '+l.transgressoes.length+' fora da lista</span>';
-    if(excesso)    situacao += '<span class="transgression-badge tb-excesso" style="margin:1px">↑ excedeu lista</span>';
-    if(semVenda && l.qtd_lista>0) situacao += '<span class="transgression-badge tb-sem-venda" style="margin:1px">sem giro</span>';
-    if(!temTransg && !excesso && !semVenda && l.qtd_lista>0) situacao += '<span class="transgression-badge tb-ok" style="margin:1px">OK</span>';
+    if(temTransg)                       situacao += '<span class="transgression-badge tb-nao-listado" style="margin:1px">⚠ '+l.transgressoes.length+' fora da lista</span>';
+    if(excesso)                         situacao += '<span class="transgression-badge tb-excesso" style="margin:1px">↑ excedeu lista</span>';
+    if(semVenda && l.qtd_lista>0)       situacao += '<span class="transgression-badge tb-sem-venda" style="margin:1px">sem giro</span>';
+    if(!temTransg&&!excesso&&!semVenda) situacao += '<span class="transgression-badge tb-ok" style="margin:1px">OK</span>';
 
-    html += '<tr class="'+rowClass+'">'
+    html += '<tr class="'+rowClass+' '+(temDetalhe?'giro-toggle-row':'')+'" '+(temDetalhe?'onclick="toggleGiroDetail(\''+sid+'\')"':'')+' >'
+      + '<td style="text-align:center;font-size:11px;color:var(--muted)">'+(temDetalhe?'<span id="gi-'+sid+'">▶</span>':'')+'</td>'
       + '<td><strong>'+esc(l.loja||l.bcps)+'</strong><br><span style="color:var(--muted);font-size:10px">#'+esc(l.bcps)+'</span></td>'
       + '<td>'+N(l.qtd_lista)+'</td>'
       + '<td>'+(excesso?'<strong style="color:var(--red)">'+N(l.qtd_vendida)+'</strong>':N(l.qtd_vendida))+'</td>'
       + '<td><div class="vazao-bar-wrap"><div class="vazao-bar"><div class="vazao-fill" style="width:'+barW+'%;background:'+barColor+'"></div></div><span style="font-size:12px;font-weight:600;color:'+barColor+'">'+P(l.vazao)+'</span></div></td>'
+      + '<td><span class="badge '+(pctDesc>40?'badge-red':pctDesc>25?'badge-yellow':'badge-green')+'">'+P(pctDesc)+'</span></td>'
+      + '<td>'+R(l.desconto)+'</td>'
       + '<td>'+N(l.skus_girados)+' / '+N(l.skus)+'</td>'
-      + '<td>'+(temTransg ? '<span style="font-weight:700;color:var(--red)">'+l.transgressoes.length+'</span>' : '<span style="color:var(--muted)">—</span>')+'</td>'
       + '<td style="min-width:160px">'+situacao+'</td>'
       + '</tr>';
 
-    // Detalhe de transgressões inline
+    // Detalhes colapsáveis
     if(temTransg){
-      const uniqTransg = {};
-      l.transgressoes.forEach(t => { const k=t.sku; if(!uniqTransg[k])uniqTransg[k]={...t,qtd_total:0,desconto_total:0}; uniqTransg[k].qtd_total+=t.qtd; uniqTransg[k].desconto_total+=t.desconto; });
-      Object.values(uniqTransg).forEach(t => {
-        html += '<tr style="background:#FFF5F5">'
-          + '<td colspan="2" style="padding-left:32px;font-size:12px;color:var(--muted)">↳ <strong style="color:var(--red)">Fora da lista:</strong> '+esc(t.produto)+'</td>'
-          + '<td colspan="2" style="font-size:12px">SKU <span style="font-family:monospace">'+esc(t.sku)+'</span> · '+N(Math.round(t.qtd_total))+' un. vendidas</td>'
-          + '<td colspan="2" style="font-size:12px">Desconto dado: <strong style="color:var(--red)">'+R(t.desconto_total)+'</strong></td>'
-          + '<td><span class="badge badge-g-venc" style="font-size:10px">'+esc(t.tag)+'</span></td>'
-          + '</tr>';
+      const uniq={};
+      l.transgressoes.forEach(t=>{const k=t.sku;if(!uniq[k])uniq[k]={...t,qtd_total:0,desc_total:0,bruto_total:0};uniq[k].qtd_total+=t.qtd;uniq[k].desc_total+=t.desconto;uniq[k].bruto_total+=t.bruto;});
+      Object.values(uniq).forEach(t=>{
+        const pct=t.bruto_total>0?t.desc_total/t.bruto_total*100:0;
+        html+='<tr class="gd-'+sid+'" style="display:none;background:#FFF5F5">'
+          +'<td></td><td colspan="2" style="padding-left:20px;font-size:12px"><span style="color:var(--red);font-weight:700">⚠ Fora da lista</span><br><span style="color:var(--muted)">'+esc(t.produto)+'</span></td>'
+          +'<td style="font-size:12px"><span style="font-family:monospace">'+esc(t.sku)+'</span><br><span style="color:var(--muted)">'+N(Math.round(t.qtd_total))+' un. vendidas</span></td>'
+          +'<td colspan="2"><span class="badge '+(pct>40?'badge-red':pct>25?'badge-yellow':'badge-green')+'" style="font-size:11px">'+P(pct)+'</span></td>'
+          +'<td style="font-size:12px"><strong style="color:var(--red)">'+R(t.desc_total)+'</strong><br><span style="color:var(--muted);font-size:11px">bruto: '+R(t.bruto_total)+'</span></td>'
+          +'<td colspan="2"><span class="badge badge-g-venc" style="font-size:10px">'+esc(t.tag)+'</span></td>'
+          +'</tr>';
       });
     }
-
-    // Detalhe de excesso inline
-    if(excesso && l.qtd_lista > 0){
-      html += '<tr style="background:#FFFBEB">'
-        + '<td colspan="2" style="padding-left:32px;font-size:12px;color:var(--muted)">↳ <strong style="color:var(--yellow)">Excedeu a lista:</strong></td>'
-        + '<td colspan="4" style="font-size:12px">Listados: <strong>'+N(l.qtd_lista)+'</strong> · Vendidos: <strong style="color:var(--yellow)">'+N(l.qtd_vendida)+'</strong> · Excesso: <strong style="color:var(--yellow)">+'+N(l.qtd_vendida-l.qtd_lista)+'</strong> unidades</td>'
-        + '<td></td>'
-        + '</tr>';
+    if(excesso && l.qtd_lista>0){
+      html+='<tr class="gd-'+sid+'" style="display:none;background:#FFFBEB">'
+        +'<td></td><td colspan="3" style="padding-left:20px;font-size:12px"><span style="color:var(--yellow);font-weight:700">↑ Excedeu a lista</span><br>'
+        +'Listados: <strong>'+N(l.qtd_lista)+'</strong> · Vendidos: <strong style="color:var(--yellow)">'+N(l.qtd_vendida)+'</strong> · Excesso: <strong style="color:var(--yellow)">+'+N(l.qtd_vendida-l.qtd_lista)+'</strong> unidades</td>'
+        +'<td colspan="5" style="font-size:12px">Desconto total: <strong>'+R(l.desconto)+'</strong> ('+P(pctDesc)+' do bruto)</td>'
+        +'</tr>';
     }
   });
-
   html += '</tbody></table></div>';
-  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px;padding:0 4px">Vazão = qtd vendida com tag vencimento ÷ qtd informada na lista de vencimento próximo. <a href="#" onclick="setPage(\'auditoria\');return false" style="color:var(--brand-green);font-weight:600">Ver auditoria detalhada →</a></div>';
   return html;
 }
 
@@ -1086,138 +1092,125 @@ function normLoja(s){
 }
 
 function renderAuditoria(){
-  if(!RAW){ return '<div class="state"><div class="icon">⏳</div><div>Aguardando dados...</div></div>'; }
+  if(!RAW) return '<div class="state"><div class="icon">⏳</div><div>Aguardando dados...</div></div>';
   const lista = RAW.lista_vencimento || [];
-  if(!lista.length){
+  if(!lista.length)
     return '<div class="state"><div class="icon">📋</div><div><strong>Lista de vencimento não carregada</strong></div><div style="font-size:12px;margin-top:8px">Execute o merge.py para incluir o arquivo CSV no dados.json</div></div>';
-  }
 
-  // Indexar lista por bcps+sku e por lojanorm+sku
-  const listaIdx = {};
-  lista.forEach(item => {
-    const k1 = item.bcps + '|' + item.sku;
-    if(!listaIdx[k1]) listaIdx[k1] = {...item, qtd_total: 0};
-    listaIdx[k1].qtd_total += item.quantidade;
-    const k2 = normLoja(item.loja) + '|' + item.sku;
-    if(!listaIdx[k2]) listaIdx[k2] = {...item, qtd_total: 0};
-    listaIdx[k2].qtd_total += item.quantidade;
+  // ── Filtros ────────────────────────────────────────────────
+  const todasLojas = [...new Set((RAW.itens_todos||[]).filter(i=>isVenc(i.tag||'')).map(i=>i.loja))].sort();
+  const lojaOpts = todasLojas.map(l=>'<option value="'+esc(l)+'" '+(FA.loja===l?'selected':'')+'>'+esc(l)+'</option>').join('');
+  let html = '<div class="filter-bar" style="margin-bottom:14px">'
+    +'<div class="filter-group"><label>Data início</label><input type="date" value="'+FA.dataIni+'" onchange="FA.dataIni=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"></div>'
+    +'<div class="filter-group"><label>Data fim</label><input type="date" value="'+FA.dataFim+'" onchange="FA.dataFim=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"></div>'
+    +'<div class="filter-group"><label>Loja</label><select onchange="FA.loja=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"><option value="">Todas as lojas</option>'+lojaOpts+'</select></div>'
+    +'<div style="align-self:flex-end"><button class="btn btn-ghost" onclick="FA={dataIni:\'\',dataFim:\'\',loja:\'\'};document.getElementById(\'data-section\').innerHTML=renderAuditoria()">✕ Limpar</button></div>'
+    +'</div>';
+
+  // ── Aplicar filtros nos itens venc ─────────────────────────
+  let vencFiltrado = (RAW.itens_todos||[]).filter(i=>isVenc(i.tag||''));
+  if(FA.dataIni){ const ini=new Date(FA.dataIni); vencFiltrado=vencFiltrado.filter(i=>{const d=parseDate(i.data);return d&&d>=ini;}); }
+  if(FA.dataFim){ const fim=new Date(FA.dataFim); vencFiltrado=vencFiltrado.filter(i=>{const d=parseDate(i.data);return d&&d<=fim;}); }
+  if(FA.loja)    vencFiltrado=vencFiltrado.filter(i=>i.loja===FA.loja);
+
+  // ── Indexar lista e vendas ─────────────────────────────────
+  const listaIdx={};
+  lista.forEach(item=>{
+    const k=item.bcps+'|'+item.sku;
+    if(!listaIdx[k])listaIdx[k]={...item,qtd_total:0};
+    listaIdx[k].qtd_total+=item.quantidade;
+  });
+  const vendasIdx={};
+  vencFiltrado.forEach(i=>{
+    const k=i.codigo_loja+'|'+i.sku;
+    if(!vendasIdx[k])vendasIdx[k]={loja:i.loja,codigo_loja:i.codigo_loja,sku:i.sku,produto:i.produto,tag:i.tag,qtd:0,desconto:0,bruto:0};
+    vendasIdx[k].qtd+=+i.qtd; vendasIdx[k].desconto+=+i.desconto; vendasIdx[k].bruto+=+i.bruto;
   });
 
-  // Indexar vendas venc por codigo_loja+sku
-  const vendasIdx = {};
-  (RAW.itens_todos || []).filter(i => isVenc(i.tag||'')).forEach(i => {
-    const k = i.codigo_loja + '|' + i.sku;
-    if(!vendasIdx[k]) vendasIdx[k] = {loja:i.loja, codigo_loja:i.codigo_loja, sku:i.sku, produto:i.produto, linha:i.linha, tag:i.tag, qtd:0, desconto:0, bruto:0};
-    vendasIdx[k].qtd     += +i.qtd;
-    vendasIdx[k].desconto+= +i.desconto;
-    vendasIdx[k].bruto   += +i.bruto;
+  // ── Vazão por SKU ──────────────────────────────────────────
+  const vazaoRows=[];
+  const vistos=new Set();
+  lista.forEach(item=>{
+    const k=item.bcps+'|'+item.sku;
+    if(vistos.has(k))return; vistos.add(k);
+    const qtd_lista=(listaIdx[k]?.qtd_total)||item.quantidade;
+    const venda=vendasIdx[item.bcps+'|'+item.sku]||null;
+    const qtd_vendida=venda?venda.qtd:0;
+    const pct_desc=venda&&venda.bruto>0?venda.desconto/venda.bruto*100:0;
+    vazaoRows.push({bcps:item.bcps,loja_csv:item.loja,sku:item.sku,descricao:item.descricao,categoria:item.categoria,validade:item.validade,rbv:item.rbv,qtd_lista,qtd_vendida,desconto:venda?venda.desconto:0,bruto:venda?venda.bruto:0,pct_desc:Math.round(pct_desc*10)/10,vazao:qtd_lista>0?Math.round(qtd_vendida/qtd_lista*1000)/10:0,excesso:qtd_vendida>qtd_lista,sem_venda:qtd_vendida===0});
   });
 
-  // Para cada item da lista, calcular vazão
-  const vazaoRows = [];
-  const listaVistos = new Set();
-  lista.forEach(item => {
-    const k = item.bcps + '|' + item.sku;
-    if(listaVistos.has(k)) return;
-    listaVistos.add(k);
-    const qtd_lista = listaIdx[k]?.qtd_total || item.quantidade;
-    // Tentar match por bcps=codigo_loja primeiro, depois por nome
-    const venda = vendasIdx[item.bcps + '|' + item.sku]
-                || vendasIdx[normLoja(item.loja) + '|' + item.sku]
-                || null;
-    const qtd_vendida = venda ? venda.qtd : 0;
-    const vazao = qtd_lista > 0 ? (qtd_vendida / qtd_lista * 100) : 0;
-    vazaoRows.push({
-      bcps: item.bcps, loja_csv: item.loja, sku: item.sku,
-      descricao: item.descricao, categoria: item.categoria,
-      validade: item.validade, rbv: item.rbv,
-      qtd_lista, qtd_vendida,
-      vazao: Math.round(vazao * 10) / 10,
-      excesso: qtd_vendida > qtd_lista,
-      sem_venda: qtd_vendida === 0,
-    });
+  // ── Transgressões ──────────────────────────────────────────
+  const listaChaves=new Set(lista.map(i=>i.bcps+'|'+i.sku));
+  const transgressoes=Object.values(vendasIdx).filter(v=>!listaChaves.has(v.codigo_loja+'|'+v.sku));
+
+  // ── Giro por loja ──────────────────────────────────────────
+  const lojaMap={};
+  vazaoRows.forEach(r=>{
+    const k=r.bcps;
+    if(!lojaMap[k])lojaMap[k]={loja:r.loja_csv,bcps:r.bcps,qtd_lista:0,qtd_vendida:0,desconto:0,bruto:0,skus:0,skus_girados:0,transgressoes:[]};
+    const l=lojaMap[k]; l.qtd_lista+=r.qtd_lista; l.qtd_vendida+=r.qtd_vendida; l.desconto+=r.desconto; l.bruto+=r.bruto; l.skus++; if(r.qtd_vendida>0)l.skus_girados++;
   });
-
-  // Transgressões: venda com tag venc em SKU não listado
-  const listaChaves = new Set(lista.map(i => i.bcps + '|' + i.sku));
-  const transgressoes = [];
-  Object.values(vendasIdx).forEach(v => {
-    const k = v.codigo_loja + '|' + v.sku;
-    const kNorm = normLoja(v.loja) + '|' + v.sku;
-    if(!listaChaves.has(k) && !listaChaves.has(kNorm)){
-      transgressoes.push({...v});
-    }
+  transgressoes.forEach(v=>{
+    const k=v.codigo_loja;
+    if(!lojaMap[k])lojaMap[k]={loja:v.loja,bcps:v.codigo_loja,qtd_lista:0,qtd_vendida:0,desconto:v.desconto,bruto:v.bruto,skus:0,skus_girados:0,transgressoes:[]};
+    lojaMap[k].transgressoes.push({sku:v.sku,produto:v.produto,qtd:v.qtd,desconto:v.desconto,bruto:v.bruto,tag:v.tag});
   });
+  const giroLojas=Object.values(lojaMap).map(l=>({...l,vazao:l.qtd_lista>0?Math.round(l.qtd_vendida/l.qtd_lista*1000)/10:0})).sort((a,b)=>(b.transgressoes.length*100+b.skus)-(a.transgressoes.length*100+a.skus));
+  const giroTotal={qtd_lista:vazaoRows.reduce((s,r)=>s+r.qtd_lista,0),qtd_vendida:vazaoRows.reduce((s,r)=>s+r.qtd_vendida,0),desconto:vazaoRows.reduce((s,r)=>s+r.desconto,0),bruto:vazaoRows.reduce((s,r)=>s+r.bruto,0),skus:vazaoRows.length,skus_girados:vazaoRows.filter(r=>r.qtd_vendida>0).length};
+  giroTotal.vazao=giroTotal.qtd_lista>0?Math.round(giroTotal.qtd_vendida/giroTotal.qtd_lista*1000)/10:0;
 
-  // KPIs de auditoria
-  const totalLista    = lista.length;
-  const comVenda      = vazaoRows.filter(r => r.qtd_vendida > 0).length;
-  const semVenda      = vazaoRows.filter(r => r.sem_venda).length;
-  const excessos      = vazaoRows.filter(r => r.excesso).length;
-  const nTransg       = transgressoes.length;
-  const vazaoMedia    = vazaoRows.length > 0 ? vazaoRows.reduce((s,r)=>s+r.vazao,0)/vazaoRows.length : 0;
-  const totalQtdLista = vazaoRows.reduce((s,r)=>s+r.qtd_lista,0);
-  const totalQtdVend  = vazaoRows.reduce((s,r)=>s+r.qtd_vendida,0);
-  const vazaoGeral    = totalQtdLista > 0 ? totalQtdVend/totalQtdLista*100 : 0;
+  // ── KPIs ───────────────────────────────────────────────────
+  const totalQtdLista=giroTotal.qtd_lista, totalQtdVend=giroTotal.qtd_vendida;
+  html+='<div class="section-title">Indicadores de Auditoria — Vencimento Próximo</div>';
+  html+='<div class="audit-grid">';
+  html+=auditKpi('c-brand','Vazão Geral de Estoque',P(giroTotal.vazao),N(totalQtdVend)+' de '+N(totalQtdLista)+' itens girados');
+  html+=auditKpi('c-navy','% Desconto s/ Bruto',P(giroTotal.bruto>0?giroTotal.desconto/giroTotal.bruto*100:0),'desconto médio nas vendas de vencimento filtradas');
+  html+=auditKpi('c-green','SKUs Girados',N(giroTotal.skus_girados)+' / '+N(giroTotal.skus),'ao menos 1 venda com tag vencimento');
+  html+=auditKpi('c-yellow','Sem Venda (parado)',N(vazaoRows.filter(r=>r.sem_venda).length),'na lista mas sem venda registrada');
+  html+=auditKpi('c-yellow','Vendas com Excesso',N(vazaoRows.filter(r=>r.excesso).length),'vendeu mais do que o informado na lista');
+  html+=auditKpi('c-red','Transgressões',N(transgressoes.length),'desconto venc em SKU fora da lista autorizada');
+  html+='</div>';
 
-  // Render
-  let html = '<div class="section-title">Indicadores de Auditoria — Vencimento Próximo</div>';
-  html += '<div class="audit-grid">';
-  html += auditKpi('c-brand','Vazão Geral de Estoque',P(vazaoGeral),N(totalQtdVend)+' de '+N(totalQtdLista)+' itens girados');
-  html += auditKpi('c-blue','SKUs na Lista',N(totalLista),'itens informados como vencimento próximo');
-  html += auditKpi('c-green','Com Venda Registrada',N(comVenda),'SKUs que tiveram ao menos 1 venda com tag venc');
-  html += auditKpi('c-yellow','Sem Venda Registrada',N(semVenda),'estoque de vencimento parado — atenção');
-  html += auditKpi('c-yellow','Vendas com Excesso',N(excessos),'vendeu mais do que o informado na lista');
-  html += auditKpi('c-red','Transgressões (SKU não listado)',N(nTransg),'desconto venc aplicado em item não autorizado');
-  html += '</div>';
+  // ── Giro por loja ──────────────────────────────────────────
+  html+='<div class="section-title" style="margin-top:16px">Giro por Loja <span style="font-size:11px;font-weight:400;color:var(--muted)">— clique na linha para expandir detalhes</span></div>';
+  html+=renderGiro(giroLojas,giroTotal);
 
-  // Giro por loja
-  html += '<div class="section-title" style="margin-top:16px">Giro de Itens de Vencimento Próximo — por Loja</div>';
-  html += renderGiro();
-
-  // Tabela de transgressões
-  html += '<div class="section-title" style="margin-top:16px">Transgressões — Desconto Vencimento em SKU Não Autorizado</div>';
+  // ── Transgressões ──────────────────────────────────────────
+  html+='<div class="section-title" style="margin-top:16px">Transgressões — SKU com Desconto Vencimento Fora da Lista</div>';
   if(!transgressoes.length){
-    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;color:var(--green);font-weight:600;text-align:center">✅ Nenhuma transgressão encontrada no período</div>';
+    html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;color:var(--green);font-weight:600;text-align:center">✅ Nenhuma transgressão no período / filtro selecionado</div>';
   } else {
-    const q = searches.auditoria_t ? searches.auditoria_t.toLowerCase() : '';
-    const rows = transgressoes.filter(r=>!q||r.produto.toLowerCase().includes(q)||r.loja.toLowerCase().includes(q)||r.sku.includes(q));
-    const maxD = Math.max(...rows.map(r=>r.desconto),1);
-    const thead = thRow('audit_t',[{k:'loja',l:'Loja'},{k:'codigo_loja',l:'Cód.'},{k:'sku',l:'SKU'},{k:'produto',l:'Produto'},{k:'tag',l:'Tag Usada'},{k:'qtd',l:'Qtd Vendida'},{k:'desconto',l:'Desconto Dado'},{k:'bruto',l:'Bruto'}],'desconto',false);
-    const tbody = rows.slice(0,PAGE_SIZE).map(r =>
-      '<tr class="alerta-crit-row">'
-      +'<td>'+esc(r.loja)+'</td>'
-      +'<td style="font-size:11px;color:var(--muted)">'+esc(r.codigo_loja)+'</td>'
-      +'<td style="font-family:monospace;font-size:11px">'+esc(r.sku)+'</td>'
-      +'<td>'+esc(r.produto)+'</td>'
-      +'<td><span class="badge badge-g-venc" style="font-size:10px">'+esc(r.tag)+'</span></td>'
-      +'<td>'+N(Math.round(r.qtd))+'</td>'
-      +'<td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill red" style="width:'+Math.round(r.desconto/maxD*100)+'%"></div></div>'+R(r.desconto)+'</div></td>'
-      +'<td>'+R(r.bruto)+'</td>'
-      +'</tr>'
-    ).join('');
-    html += '<div class="search-row"><input type="text" placeholder="Buscar produto, loja, SKU..." oninput="searches.auditoria_t=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"><span class="count">'+N(rows.length)+' item(ns)</span></div>';
-    html += tableWrap(thead,tbody,rows.length,1,'audit_t');
+    const q=(searches.auditoria_t||'').toLowerCase();
+    const rows=transgressoes.filter(r=>!q||r.produto.toLowerCase().includes(q)||r.loja.toLowerCase().includes(q)||r.sku.includes(q));
+    const maxD=Math.max(...rows.map(r=>r.desconto),1);
+    const thead=thRow('audit_t',[{k:'loja',l:'Loja'},{k:'sku',l:'SKU'},{k:'produto',l:'Produto'},{k:'tag',l:'Tag Usada'},{k:'qtd',l:'Qtd Vendida'},{k:'bruto',l:'Bruto'},{k:'desconto',l:'Desconto'},{k:'pct',l:'% Desc'}],'desconto',false);
+    const tbody=rows.slice(0,PAGE_SIZE).map(r=>{
+      const pct=r.bruto>0?r.desconto/r.bruto*100:0;
+      return '<tr class="alerta-crit-row">'
+        +'<td>'+esc(r.loja)+'<br><span style="color:var(--muted);font-size:10px">#'+esc(r.codigo_loja)+'</span></td>'
+        +'<td style="font-family:monospace;font-size:11px">'+esc(r.sku)+'</td>'
+        +'<td>'+esc(r.produto)+'</td>'
+        +'<td><span class="badge badge-g-venc" style="font-size:10px">'+esc(r.tag)+'</span></td>'
+        +'<td>'+N(Math.round(r.qtd))+'</td>'
+        +'<td>'+R(r.bruto)+'</td>'
+        +'<td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill red" style="width:'+Math.round(r.desconto/maxD*100)+'%"></div></div>'+R(r.desconto)+'</div></td>'
+        +'<td><span class="badge '+(pct>40?'badge-red':pct>25?'badge-yellow':'badge-green')+'">'+P(pct)+'</span></td>'
+        +'</tr>';
+    }).join('');
+    html+='<div class="search-row"><input type="text" placeholder="Buscar produto, loja, SKU..." oninput="searches.auditoria_t=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"><span class="count">'+N(rows.length)+' item(ns)</span></div>';
+    html+=tableWrap(thead,tbody,rows.length,1,'audit_t');
   }
 
-  // Tabela de vazão por SKU
-  html += '<div class="section-title" style="margin-top:16px">Vazão por SKU — Lista de Vencimento Próximo</div>';
-  const qv = searches.auditoria_v ? searches.auditoria_v.toLowerCase() : '';
-  const vazaoFilt = vazaoRows
-    .filter(r=>!qv||r.descricao.toLowerCase().includes(qv)||r.loja_csv.toLowerCase().includes(qv)||r.sku.includes(qv))
-    .sort((a,b)=>a.vazao-b.vazao);
-  const theadV = thRow('audit_v',[{k:'loja_csv',l:'Loja'},{k:'sku',l:'SKU'},{k:'descricao',l:'Produto'},{k:'categoria',l:'Categoria'},{k:'validade',l:'Validade'},{k:'qtd_lista',l:'Qtd Lista'},{k:'qtd_vendida',l:'Qtd Vendida'},{k:'vazao',l:'Vazão %'}],'vazao',true);
-  const tbodyV = vazaoFilt.slice(0,PAGE_SIZE).map(r => {
-    const color = r.excesso?'var(--yellow)':r.qtd_vendida===0?'var(--muted)':r.vazao>=80?'var(--green)':'var(--blue)';
-    const barColor = r.excesso?'gold':r.qtd_vendida===0?'':'green';
-    const barW = Math.min(r.vazao,100);
-    const status = r.excesso
-      ? '<span class="transgression-badge tb-excesso">Excesso</span>'
-      : r.sem_venda
-        ? '<span class="transgression-badge tb-sem-venda">Sem venda</span>'
-        : r.vazao >= 100
-          ? '<span class="transgression-badge tb-ok">100%</span>'
-          : '<span class="transgression-badge tb-ok">'+P(r.vazao)+'</span>';
+  // ── Vazão por SKU ──────────────────────────────────────────
+  html+='<div class="section-title" style="margin-top:16px">Vazão por SKU — Lista de Vencimento Próximo</div>';
+  const qv=(searches.auditoria_v||'').toLowerCase();
+  const vazaoFilt=vazaoRows.filter(r=>!qv||r.descricao.toLowerCase().includes(qv)||r.loja_csv.toLowerCase().includes(qv)||r.sku.includes(qv)).sort((a,b)=>a.vazao-b.vazao);
+  const theadV=thRow('audit_v',[{k:'loja_csv',l:'Loja'},{k:'sku',l:'SKU'},{k:'descricao',l:'Produto'},{k:'categoria',l:'Categoria'},{k:'validade',l:'Validade'},{k:'qtd_lista',l:'Qtd Lista'},{k:'qtd_vendida',l:'Qtd Vendida'},{k:'pct_desc',l:'% Desc'},{k:'desconto',l:'Desconto'},{k:'vazao',l:'Vazão %'}],'vazao',true);
+  const tbodyV=vazaoFilt.slice(0,PAGE_SIZE).map(r=>{
+    const bc=r.excesso?'var(--yellow)':r.qtd_vendida===0?'var(--muted)':r.vazao>=80?'var(--green)':'var(--blue)';
+    const bw=Math.min(r.vazao,100);
+    const st=r.excesso?'<span class="transgression-badge tb-excesso">Excesso</span>':r.sem_venda?'<span class="transgression-badge tb-sem-venda">Sem venda</span>':'<span class="transgression-badge tb-ok">'+P(r.vazao)+'</span>';
     return '<tr class="'+(r.excesso?'alerta-row':r.sem_venda?'':'venc-row')+'">'
       +'<td>'+esc(r.loja_csv)+'<br><span style="color:var(--muted);font-size:10px">BCPS '+esc(r.bcps)+'</span></td>'
       +'<td style="font-family:monospace;font-size:11px">'+esc(r.sku)+'</td>'
@@ -1225,12 +1218,14 @@ function renderAuditoria(){
       +'<td><span class="badge badge-blue" style="font-size:10px">'+esc(r.categoria)+'</span></td>'
       +'<td style="font-size:11px">'+esc(r.validade)+'</td>'
       +'<td>'+N(r.qtd_lista)+'</td>'
-      +'<td>'+N(r.qtd_vendida)+'</td>'
-      +'<td><div class="vazao-bar-wrap"><div class="vazao-bar"><div class="vazao-fill bar-fill '+barColor+'" style="width:'+barW+'%;background:'+color+'"></div></div>'+status+'</div></td>'
+      +'<td>'+(r.excesso?'<strong style="color:var(--yellow)">'+N(r.qtd_vendida)+'</strong>':N(r.qtd_vendida))+'</td>'
+      +'<td><span class="badge '+(r.pct_desc>40?'badge-red':r.pct_desc>25?'badge-yellow':'badge-green')+'">'+P(r.pct_desc)+'</span></td>'
+      +'<td>'+R(r.desconto)+'</td>'
+      +'<td><div class="vazao-bar-wrap"><div class="vazao-bar"><div class="vazao-fill" style="width:'+bw+'%;background:'+bc+'"></div></div>'+st+'</div></td>'
       +'</tr>';
   }).join('');
-  html += '<div class="search-row"><input type="text" placeholder="Buscar produto, loja, SKU..." oninput="searches.auditoria_v=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"><span class="count">'+N(vazaoFilt.length)+' itens</span></div>';
-  html += tableWrap(theadV,tbodyV,vazaoFilt.length,1,'audit_v');
+  html+='<div class="search-row"><input type="text" placeholder="Buscar produto, loja, SKU..." oninput="searches.auditoria_v=this.value;document.getElementById(\'data-section\').innerHTML=renderAuditoria()"><span class="count">'+N(vazaoFilt.length)+' itens</span></div>';
+  html+=tableWrap(theadV,tbodyV,vazaoFilt.length,1,'audit_v');
 
   return html;
 }
