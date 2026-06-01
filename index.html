@@ -310,7 +310,7 @@ tbody td{padding:8px 12px;vertical-align:middle}
 </div>
 <script>
 // ── Formatters ────────────────────────────────────────────────────
-const R  = v => 'R$ ' + (+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R  = v => 'R$ ' + (+v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const P  = v => (+v||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}) + '%';
 const N  = v => (+v||0).toLocaleString('pt-BR');
 const esc= s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
