@@ -575,8 +575,6 @@ function renderDataSection(){
     '<div class="saving-note">Saving = Valor Líquido recuperado. Sem a ação de desconto, esses produtos seriam descartados com perda de 100% do valor de custo.</div>'+
   '</div>'+
 
-  '<div class="section-title">Giro de Itens de Vencimento Próximo — por Loja</div>'+
-  renderGiro()+
   '<div class="section-title">Indicadores de Eficiência das Ações de Giro</div>'+
   renderEficiencia()+
 
@@ -1173,8 +1171,12 @@ function renderAuditoria(){
   html += auditKpi('c-red','Transgressões (SKU não listado)',N(nTransg),'desconto venc aplicado em item não autorizado');
   html += '</div>';
 
+  // Giro por loja
+  html += '<div class="section-title" style="margin-top:16px">Giro de Itens de Vencimento Próximo — por Loja</div>';
+  html += renderGiro();
+
   // Tabela de transgressões
-  html += '<div class="section-title">Transgressões — Desconto Vencimento em SKU Não Autorizado</div>';
+  html += '<div class="section-title" style="margin-top:16px">Transgressões — Desconto Vencimento em SKU Não Autorizado</div>';
   if(!transgressoes.length){
     html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;color:var(--green);font-weight:600;text-align:center">✅ Nenhuma transgressão encontrada no período</div>';
   } else {
