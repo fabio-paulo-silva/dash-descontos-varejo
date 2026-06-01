@@ -442,6 +442,49 @@ function calcular(itens){
   const linhaMap={}; vencItems.forEach(i=>{const l=i.linha||'Sem linha';if(!linhaMap[l])linhaMap[l]={linha:l,bruto:0,liquido:0,qtd:0};linhaMap[l].bruto+=+i.bruto;linhaMap[l].liquido+=+i.liquido;linhaMap[l].qtd+=+i.qtd;});
   const topLinhas=Object.values(linhaMap).sort((a,b)=>b.bruto-a.bruto).slice(0,8);
 
+  // ── Giro de vencimento próximo ────────────────
+  const listaVenc = RAW.lista_vencimento || [];
+  const vendasVencIdx = {};
+  vencItems.forEach(i => {
+    const k = i.codigo_loja + '|' + i.sku;
+    if(!vendasVencIdx[k]) vendasVencIdx[k] = 0;
+    vendasVencIdx[k] += +i.qtd;
+  });
+  const listaIdx2 = {};
+  listaVenc.forEach(item => {
+    const k = item.bcps + '|' + item.sku;
+    if(!listaIdx2[k]) listaIdx2[k] = {loja:item.loja, bcps:item.bcps, sku:item.sku, descricao:item.descricao, qtd_lista:0};
+    listaIdx2[k].qtd_lista += item.quantidade;
+  });
+  const giroRows = Object.values(listaIdx2).map(item => {
+    const qtd_vendida = vendasVencIdx[item.bcps + '|' + item.sku] || 0;
+    return {...item, qtd_vendida, vazao: item.qtd_lista > 0 ? Math.round(qtd_vendida / item.qtd_lista * 1000) / 10 : 0};
+  });
+  const giroLojaMap = {};
+  giroRows.forEach(r => {
+    if(!giroLojaMap[r.bcps]) giroLojaMap[r.bcps] = {loja:r.loja, bcps:r.bcps, qtd_lista:0, qtd_vendida:0, skus:0, skus_girados:0};
+    const l = giroLojaMap[r.bcps];
+    l.qtd_lista  += r.qtd_lista;
+    l.qtd_vendida+= r.qtd_vendida;
+    l.skus++;
+    if(r.qtd_vendida > 0) l.skus_girados++;
+  });
+  const giroLojas = Object.values(giroLojaMap).map(l => ({...l, vazao: l.qtd_lista > 0 ? Math.round(l.qtd_vendida/l.qtd_lista*1000)/10 : 0})).sort((a,b)=>b.vazao-a.vazao);
+  const giroTotal = {qtd_lista: giroRows.reduce((s,r)=>s+r.qtd_lista,0), qtd_vendida: giroRows.reduce((s,r)=>s+r.qtd_vendida,0), skus: giroRows.length, skus_girados: giroRows.filter(r=>r.qtd_vendida>0).length};
+  giroTotal.vazao = giroTotal.qtd_lista > 0 ? Math.round(giroTotal.qtd_vendida/giroTotal.qtd_lista*1000)/10 : 0;
+  // Itens vendidos com tag venc fora da lista (transgressão por loja)
+  const listaChavesGiro = new Set(listaVenc.map(i => i.bcps+'|'+i.sku));
+  vencItems.forEach(i => {
+    const k = i.codigo_loja+'|'+i.sku;
+    if(!listaChavesGiro.has(k)){
+      if(!giroLojaMap[i.codigo_loja]) giroLojaMap[i.codigo_loja]={loja:i.loja,bcps:i.codigo_loja,qtd_lista:0,qtd_vendida:0,skus:0,skus_girados:0};
+      if(!giroLojaMap[i.codigo_loja].transgressoes) giroLojaMap[i.codigo_loja].transgressoes=[];
+      giroLojaMap[i.codigo_loja].transgressoes.push({sku:i.sku,produto:i.produto,qtd:+i.qtd,desconto:+i.desconto,tag:i.tag});
+    }
+  });
+  // Recalcular giroLojas com transgressoes
+  const giroLojasComTransg = Object.values(giroLojaMap).map(l => ({...l, vazao: l.qtd_lista>0?Math.round(l.qtd_vendida/l.qtd_lista*1000)/10:0, transgressoes:l.transgressoes||[]})).sort((a,b)=>(b.transgressoes.length+b.skus)-(a.transgressoes.length+a.skus));
+
   const totalAlertas=itens.filter(i=>i.alerta).length + kpis_promo.sem_id_count + alertas_fid_alta.length;
   const alertas_criticos=itens.filter(i=>i.pct>60);
   const alertas_normais=itens.filter(i=>i.alerta&&i.pct<=60);
@@ -452,7 +495,8 @@ function calcular(itens){
     por_campanha, por_loja, itens, alertas:alertas_normais, alertas_criticos, vencimento:vencItems, evolucao_venc, topSkus, topLinhas,
     por_campanha_promo, por_loja_promo, evolucao_promo, alertas_promo_sem_id,
     por_loja_fid, evolucao_fid, alertas_fid_alta,
-    kpis_promo, kpis_fid
+    kpis_promo, kpis_fid,
+    giro:{ total:giroTotal, lojas:giroLojasComTransg, rows:giroRows }
   };
 }
 
@@ -531,6 +575,8 @@ function renderDataSection(){
     '<div class="saving-note">Saving = Valor Líquido recuperado. Sem a ação de desconto, esses produtos seriam descartados com perda de 100% do valor de custo.</div>'+
   '</div>'+
 
+  '<div class="section-title">Giro de Itens de Vencimento Próximo — por Loja</div>'+
+  renderGiro()+
   '<div class="section-title">Indicadores de Eficiência das Ações de Giro</div>'+
   renderEficiencia()+
 
@@ -563,6 +609,81 @@ function buildSavingHeroKpi(sv){
     +'<span class="hero-badge">Perda evitada: '+R(sv.venc_bruto)+'</span>'
     +'<span class="hero-badge">Custo do desconto: '+R(sv.venc_desconto)+'</span>'
     +'</div></div>';
+}
+
+// ── Giro por loja ─────────────────────────────────────────────────
+function renderGiro(){
+  const g = D.giro;
+  if(!g || !g.lojas.length){
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;color:var(--muted);font-size:13px">Lista de vencimento próximo não carregada. Execute o merge.py para habilitar o giro.</div>';
+  }
+  const gt = g.total;
+  // KPIs de giro
+  let html = '<div class="kpi-grid" style="margin-bottom:14px">'
+    + kpiCard('c-brand','Vazão Geral',P(gt.vazao), N(gt.qtd_vendida)+' vendidos de '+N(gt.qtd_lista)+' listados')
+    + kpiCard('c-green','SKUs Girados',N(gt.skus_girados)+' / '+N(gt.skus),'SKUs com ao menos 1 venda com tag vencimento')
+    + kpiCard('c-red','Transgressões',N(g.lojas.reduce((s,l)=>s+l.transgressoes.length,0)),'vendas com tag venc em SKU não autorizado')
+    + kpiCard('c-yellow','SKUs Parados',N(gt.skus - gt.skus_girados),'na lista mas sem venda registrada')
+    + '</div>';
+
+  // Tabela por loja — expansível
+  html += '<div class="table-wrap"><table><thead><tr>'
+    + '<th>Loja</th><th>Qtd Lista</th><th>Qtd Vendida</th><th>Vazão</th>'
+    + '<th>SKUs Girados</th><th>Transgressões</th><th>Situação</th>'
+    + '</tr></thead><tbody>';
+
+  g.lojas.forEach(l => {
+    const temTransg = l.transgressoes.length > 0;
+    const semVenda  = l.qtd_lista > 0 && l.qtd_vendida === 0;
+    const excesso   = l.qtd_vendida > l.qtd_lista && l.qtd_lista > 0;
+    const rowClass  = temTransg ? 'alerta-crit-row' : excesso ? 'alerta-row' : semVenda ? '' : 'venc-row';
+    const barColor  = temTransg||excesso ? 'var(--red)' : l.vazao>=80 ? 'var(--green)' : l.vazao>0 ? 'var(--brand-green)' : 'var(--muted)';
+    const barW      = Math.min(l.vazao||0, 100);
+
+    // Situação descritiva
+    let situacao = '';
+    if(temTransg)  situacao += '<span class="transgression-badge tb-nao-listado" style="margin:1px">⚠ '+l.transgressoes.length+' fora da lista</span>';
+    if(excesso)    situacao += '<span class="transgression-badge tb-excesso" style="margin:1px">↑ excedeu lista</span>';
+    if(semVenda && l.qtd_lista>0) situacao += '<span class="transgression-badge tb-sem-venda" style="margin:1px">sem giro</span>';
+    if(!temTransg && !excesso && !semVenda && l.qtd_lista>0) situacao += '<span class="transgression-badge tb-ok" style="margin:1px">OK</span>';
+
+    html += '<tr class="'+rowClass+'">'
+      + '<td><strong>'+esc(l.loja||l.bcps)+'</strong><br><span style="color:var(--muted);font-size:10px">#'+esc(l.bcps)+'</span></td>'
+      + '<td>'+N(l.qtd_lista)+'</td>'
+      + '<td>'+(excesso?'<strong style="color:var(--red)">'+N(l.qtd_vendida)+'</strong>':N(l.qtd_vendida))+'</td>'
+      + '<td><div class="vazao-bar-wrap"><div class="vazao-bar"><div class="vazao-fill" style="width:'+barW+'%;background:'+barColor+'"></div></div><span style="font-size:12px;font-weight:600;color:'+barColor+'">'+P(l.vazao)+'</span></div></td>'
+      + '<td>'+N(l.skus_girados)+' / '+N(l.skus)+'</td>'
+      + '<td>'+(temTransg ? '<span style="font-weight:700;color:var(--red)">'+l.transgressoes.length+'</span>' : '<span style="color:var(--muted)">—</span>')+'</td>'
+      + '<td style="min-width:160px">'+situacao+'</td>'
+      + '</tr>';
+
+    // Detalhe de transgressões inline
+    if(temTransg){
+      const uniqTransg = {};
+      l.transgressoes.forEach(t => { const k=t.sku; if(!uniqTransg[k])uniqTransg[k]={...t,qtd_total:0,desconto_total:0}; uniqTransg[k].qtd_total+=t.qtd; uniqTransg[k].desconto_total+=t.desconto; });
+      Object.values(uniqTransg).forEach(t => {
+        html += '<tr style="background:#FFF5F5">'
+          + '<td colspan="2" style="padding-left:32px;font-size:12px;color:var(--muted)">↳ <strong style="color:var(--red)">Fora da lista:</strong> '+esc(t.produto)+'</td>'
+          + '<td colspan="2" style="font-size:12px">SKU <span style="font-family:monospace">'+esc(t.sku)+'</span> · '+N(Math.round(t.qtd_total))+' un. vendidas</td>'
+          + '<td colspan="2" style="font-size:12px">Desconto dado: <strong style="color:var(--red)">'+R(t.desconto_total)+'</strong></td>'
+          + '<td><span class="badge badge-g-venc" style="font-size:10px">'+esc(t.tag)+'</span></td>'
+          + '</tr>';
+      });
+    }
+
+    // Detalhe de excesso inline
+    if(excesso && l.qtd_lista > 0){
+      html += '<tr style="background:#FFFBEB">'
+        + '<td colspan="2" style="padding-left:32px;font-size:12px;color:var(--muted)">↳ <strong style="color:var(--yellow)">Excedeu a lista:</strong></td>'
+        + '<td colspan="4" style="font-size:12px">Listados: <strong>'+N(l.qtd_lista)+'</strong> · Vendidos: <strong style="color:var(--yellow)">'+N(l.qtd_vendida)+'</strong> · Excesso: <strong style="color:var(--yellow)">+'+N(l.qtd_vendida-l.qtd_lista)+'</strong> unidades</td>'
+        + '<td></td>'
+        + '</tr>';
+    }
+  });
+
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px;color:var(--muted);margin-top:6px;padding:0 4px">Vazão = qtd vendida com tag vencimento ÷ qtd informada na lista de vencimento próximo. <a href="#" onclick="setPage(\'auditoria\');return false" style="color:var(--brand-green);font-weight:600">Ver auditoria detalhada →</a></div>';
+  return html;
 }
 
 // ── Eficiência ────────────────────────────────────────────────────
